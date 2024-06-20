@@ -815,22 +815,24 @@ class Vibronic:
 
         self.second_order_energy_correction = _blc_es + _dse_es 
 
+
+
     def compute_third_order_ddd(self, n_el, E_array, state_index=0):
         """
         Helper function that compute the third order correction 
         <N|dd|P><P|dd|Q><Q|dd|N>/[(EN - EP) * (EN-EQ)]
         that contains only DSE terms that arise when m_N = m_P = m_Q = 0
         """
-        _N = state_index
+        _N = 0
 
         # calculate some intermediates
         
         # contract over g for the <N|dd|P> and <Q|dd|N> terms, which 
         # yield the same vector
-        A = np.einsum("g, gp -> p", d[_N,:], d, optimize=True)
+        A = np.einsum("g, gp -> p", self.d_array[_N,:], self.d_array, optimize=True)
 
         # contract over g for the <P|DD|Q> term, which yields a matrix
-        B = np.einsum("pg, gp -> pq", d, d, optimize=True)
+        B = np.einsum("pg, gq -> pq", self.d_array, self.d_array, optimize=True)
 
         # get the energy difference for the denominator
         delta_E = E_array[_N] - E_array
@@ -843,8 +845,96 @@ class Vibronic:
         # Step 1 is the contraction of B[pq] * A_tilde[q]
         _t1 = np.einsum("pq,q->p", B, A_tilde)
         # Step 2 is the contraction of A_tilde[p] * _t1[p]
-        self.third_order_ddd = np.einsum("p,p->", A_tilde, _t1)
- 
+        self.third_order_ddd =(1/8) * np.einsum("p,p->", A_tilde, _t1)
+
+    
+    
+    def compute_third_order_bdb(self, n_el, E_array, state_index=0):
+        """
+        Helper function that compute the third order correction 
+        <N|b|P><P|dd|Q><Q|b|N>/[(EN - EP) * (EN-EQ)]
+        that contains product of BLC * DSE *DSE  terms that arise when m_p = m_q =/ m_n
+        """
+        _N = state_index
+
+        # calculate some intermediates
+
+        A = self.d_array[_N, : ]
+
+        # contract over g for the <P|DD|Q> term, which yields a matrix
+        B = np.einsum("pg, gq -> pq", self.d_array, self.d_array, optimize=True)
+
+        # get the energy difference for the denominator
+        delta_E = E_array[_N] - E_array - self.omega
+        delta_E[delta_E == 0] = np.inf
+
+        # Form A / delta_E terms and store in A_tilde
+        A_tilde = np.zeros_like(A)
+        A_tilde = A/ delta_E
+
+        # now perform the sums in two steps:
+        # Step 1 is the contraction of B[pq] * A_tilde[q]
+        _t1 = np.einsum("pq,q->p", B, A_tilde)
+        # Step 2 is the contraction of A_tilde[p] * _t1[p]
+        self.third_order_bdb =  (self.omega/4)   *   np.einsum("p,p->", A_tilde, _t1)
+
+
+
+    def compute_third_order_bbd(self, n_el, E_array, state_index=0):
+        """
+        Helper function that compute the third order correction 
+        <N|b|P><P|b|Q><Q|dd|N>/[(EN - EP) * (EN-EQ)]
+        that contains product of BLC * DSE *DSE  terms that arise when m_p = m_q =/ m_n
+        """
+        _N = 0
+
+        # calculate some intermediates
+
+        A = np.einsum("g, gp -> p",self.d_array[_N,:], self.d_array, optimize = True )
+
+        A_2 = self.d_array[_N , :]
+
+        # contract over g for the <P|DD|Q> term, which yields a matrix
+        B = self.d_array
+
+        # get the energy difference for the denominator
+        delta_E_1 = E_array[_N] - E_array - self.omega
+        delta_E_2 = E_array[_N] - E_array
+
+        delta_E_1[delta_E_1 == 0] = np.inf
+        delta_E_2[delta_E_2 == 0] = np.inf
+
+
+        # Form A / delta_E terms and store in A_tilde
+        A_tilde_1 = np.zeros_like(A)
+        A_tilde_1 = A_2/ delta_E_1
+
+
+        # Form A / delta_E terms and store in A_tilde
+        A_tilde_2 = np.zeros_like(A)
+        A_tilde_2 = A / delta_E_2
+
+        # now perform the sums in two steps:
+        # Step 1 is the contraction of B[pq] * A_tilde[q]
+        _t1 = np.einsum("pq,q->p", B, A_tilde_1)
+        # Step 2 is the contraction of A_tilde[p] * _t1[p]
+        self.third_order_bbd =  (self.omega/4)   *   np.einsum("p,p->", A_tilde_2, _t1)
+
+
+
+    def compute_third_order_energy_correction(self, n_el, omega, E_array, state_index = 0):
+
+        if state_index != 0:
+            print(" We can't handle PT3 for excited states yet!")
+            exit()
+
+        self.compute_third_order_bbd(n_el, E_array, state_index)
+        self.compute_third_order_bdb( n_el, E_array, state_index)
+        self.compute_third_order_ddd(n_el, E_array, state_index)
+
+        self.third_order_energy_correction = self.third_order_ddd * (2*self.third_order_bbd) * self.third_order_bdb
+
+
 
 
 
