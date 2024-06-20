@@ -942,6 +942,46 @@ class Vibronic:
 
 
 
+
+    def compute_third_order_last_part(self, n_el, E_array, state_index=0):
+
+
+        mu_n = state_index
+        m_n = 0
+
+        # prepare inverse E_mu_n - E_mu_m array
+        E_mn = np.zeros_like(E_array)
+        E_mn_min_omega = np.zeros_like(E_array)
+
+        # again assumes ground-state
+        E_mn[1:] = 1 / (E_array[mu_n] - E_array[1:])**2
+        E_mn_min_omega = 1 / (E_array[mu_n] - E_array - self.omega)**2
+
+        # take element-by-element square of d_matrix for the sum
+        _blc_tmp = self.omega / 2 * self.d_array[:,mu_n] * self.d_array[:,mu_n] * E_mn_min_omega * np.sqrt(m_n + 1)
+
+        # sum numerator and denominator of blc term 1 separately
+        _blc_es = np.einsum("i->", _blc_tmp, optimize=True)
+        
+        # first perform contraction over gamma for all values of mu_M
+        _dse_tmp = np.einsum("ij,j->i", self.d_array, self.d_array[:,mu_n], optimize=True)
+
+        # exclude the mu_M = mu_N term
+        _dse_tmp[mu_n] = 0
+        
+        # now compute the square of the summed terms in the numerator and the difference of terms in denominator
+        _dse_tmp2 = _dse_tmp * _dse_tmp * E_mn
+        
+        _dse_es = 1 / 4 * np.einsum("i->", _dse_tmp2, optimize=True)
+      
+
+        third_order_last_part = _blc_es + _dse_es 
+
+
+        self.third_order_last_part = third_order_last_part * self.first_order_energy_correction
+
+
+
     def compute_third_order_energy_correction(self, n_el, omega, E_array, state_index = 0):
 
         if state_index != 0:
@@ -951,8 +991,9 @@ class Vibronic:
         self.compute_third_order_bbd(n_el, E_array, state_index)
         self.compute_third_order_bdb( n_el, E_array, state_index)
         self.compute_third_order_ddd(n_el, E_array, state_index)
+        self.compute_third_order_last_part(n_el, E_array, state_index)
 
-        self.third_order_energy_correction = self.third_order_ddd + (2*self.third_order_bbd) + self.third_order_bdb
+        self.third_order_energy_correction = self.third_order_ddd + (2*self.third_order_bbd) + self.third_order_bdb -  self.third_order_last_part
 
 
 
