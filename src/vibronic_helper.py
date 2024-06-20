@@ -711,6 +711,26 @@ class Vibronic:
 
 
             return E_array[0] + self.first_order_energy_correction + self.second_order_energy_correction
+        elif order==3:
+            # compute first order energy correction
+            self.compute_first_order_energy_correction(n_el, state_index = 0)
+
+            # compute second order energy correction
+            self.compute_second_order_energy_correction(n_el, omega, E_array, state_index = 0)
+
+            # compute third order energy correction
+            self.compute_third_order_energy_correction(n_el, omega, E_array, state_index = 0)
+
+            
+
+            print(F' PT1 Correction is {self.first_order_energy_correction}')
+            print(F' PT2 Correction is {self.second_order_energy_correction}')
+            print(F' PT3 Correction is {self.third_order_energy_correction}')
+
+
+            return E_array[0] + self.first_order_energy_correction + self.second_order_energy_correction + self.third_order_energy_correction
+    
+    
     
 
     def compute_first_order_energy_correction_loop(self,n_el, state_index = 0):
@@ -932,7 +952,7 @@ class Vibronic:
         self.compute_third_order_bdb( n_el, E_array, state_index)
         self.compute_third_order_ddd(n_el, E_array, state_index)
 
-        self.third_order_energy_correction = self.third_order_ddd * (2*self.third_order_bbd) * self.third_order_bdb
+        self.third_order_energy_correction = self.third_order_ddd + (2*self.third_order_bbd) + self.third_order_bdb
 
 
 
