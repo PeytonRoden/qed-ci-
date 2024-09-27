@@ -659,6 +659,7 @@ class Vibronic:
         self.PCQED_pf_vecs = np.copy(vecs)
 
     def compute_qed_pt_energy(self, n_el, omega, lambda_vector, E_array, mu_array, state_index = 0, order=2):
+
         # defaults to second order for the ground state
         self.build_d_array(
             n_el, lambda_vector, mu_array, coherent_state=False
@@ -727,7 +728,34 @@ class Vibronic:
             print(F' PT2 Correction is {self.second_order_energy_correction}')
             print(F' PT3 Correction is {self.third_order_energy_correction}')
 
+            delta_E = E_array[1] - E_array[0]
+            correction_data = {
 
+                "pt1_correction_d" : self.first_order_energy_correction,
+                "zeroth_order_energy_gap" : delta_E,
+                "pt1_d_radius" : self.first_order_energy_correction / (1/2 * delta_E),
+                "pt2_correction_dd" : self.second_order_dse_sq,
+                "pt2_correction_bb" : self.second_order_blc_sq,
+                "pt2_dd_radius" : np.sqrt(self.second_order_dse_sq) / (1/2 * delta_E),
+                "pt2_bb_radius" : np.sqrt(self.second_order_dse_sq) / (1/2 * delta_E),
+                "pt3_ddd_radius" : self.third_order_ddd ** (1/3) / (1/2 * delta_E),
+                "pt3_bbd_radius" : self.third_order_bbd ** (1/3) / (1/2 * delta_E),
+                "pt3_bdb_radius" : self.third_order_bdb ** (1/3) / (1/2 * delta_E),
+                "pt3_lp_radius" : self.third_order_last_part ** (1/3) / (1/2 * delta_E),
+                "pt3_correction_ddd" : self.third_order_ddd,
+                "pt3_correction_bbd" : self.third_order_bbd,
+                "pt3_correction_bdb" : self.third_order_bdb,
+                "pt3_correction_lp" : self.third_order_last_part,
+
+            }
+
+            ### Uncomment to write json!
+            json_object = json.dumps(correction_data, indent=4)
+            with open("pt_correction_info.json", "w") as outfile:
+                outfile.write(json_object)
+
+
+#self.third_order_energy_correction = self.third_order_ddd + (2*self.third_order_bbd) + self.third_order_bdb -  self.third_order_last_part
             return E_array[0] + self.first_order_energy_correction + self.second_order_energy_correction + self.third_order_energy_correction
     
     
@@ -831,8 +859,14 @@ class Vibronic:
         _dse_tmp2 = _dse_tmp * _dse_tmp * E_mn
         
         _dse_es = 1 / 4 * np.einsum("i->", _dse_tmp2, optimize=True)
-      
 
+        # store the blc^2 term
+        self.second_order_blc_sq = _blc_es
+
+        # store the dse^2 term
+        self.second_order_dse_sq = _dse_es
+
+        # store the total second order correction
         self.second_order_energy_correction = _blc_es + _dse_es 
 
 
